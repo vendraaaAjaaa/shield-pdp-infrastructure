@@ -1,0 +1,118 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: shield-pdp-db
+    profiles:
+      - local-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${LOCAL_DB_USER:-shield}
+      POSTGRES_PASSWORD: ${LOCAL_DB_PASSWORD:-local-db-change-me}
+      POSTGRES_DB: ${LOCAL_DB_NAME:-shield_pdp_db}
+    volumes:
+      - shield_pdp_db_data:/var/lib/postgresql/data
+    networks:
+      - shield_pdp_lan
+    healthcheck:
+      test: ["CMD-SHELL", 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  api-vulnerable:
+    build:
+      context: ./api/vulnerable
+    container_name: shield-pdp-api-vulnerable
+    restart: unless-stopped
+    env_file:
+      - path: ./.env
+        required: false
+      - path: /opt/shield/secrets/database.env
+        required: false
+    environment:
+      APP_ENV: ${APP_ENV:-demo}
+      DB_HOST: ${DB_HOST:-100.110.198.103}
+      DB_PORT: ${DB_PORT:-5432}
+      SECRET_KEY: ${SECRET_KEY:-shield-pdp-demo-secret-change-before-production-64bytes}
+      JWT_ISSUER: ${JWT_ISSUER:-shield-pdp}
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000,http://localhost:3200,http://127.0.0.1:3200,http://192.168.18.205:3200,http://localhost:8000}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      RESET_DEMO_PASSWORDS: ${RESET_DEMO_PASSWORDS:-false}
+      ENABLE_VULNERABLE_DEMO: ${ENABLE_VULNERABLE_DEMO:-true}
+    networks:
+      - shield_pdp_lan
+    ports:
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD-SHELL", 'python -c "import urllib.request; urllib.request.urlopen(\"http://127.0.0.1:8000/ready\", timeout=3).read()"']
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  proxy:
+    image: nginx:1.27-alpine
+    container_name: shield-pdp-proxy
+    entrypoint: ["nginx", "-g", "daemon off;"]
+    user: "101:101"
+    restart: unless-stopped
+    depends_on:
+      api-vulnerable:
+        condition: service_healthy
+    ports:
+      - "3000:8080"
+    volumes:
+      - ./infrastructure/networks/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./dashboard/frontend:/usr/share/nginx/html:ro
+    networks:
+      - shield_pdp_dmz
+      - shield_pdp_lan
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health >/dev/null 2>&1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  soc-node:
+    image: alpine:3.20
+    container_name: shield-pdp-soc
+    restart: unless-stopped
+    command: ["sh", "-c", "tail -f /dev/null"]
+    depends_on:
+      proxy:
+        condition: service_healthy
+    networks:
+      - shield_pdp_lan
+      - shield_pdp_soc
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+networks:
+  shield_pdp_dmz:
+    name: shield_pdp_dmz
+  shield_pdp_lan:
+    name: shield_pdp_lan
+    internal: true
+  shield_pdp_soc:
+    name: shield_pdp_soc
+    internal: true
+
+volumes:
+  shield_pdp_db_data:

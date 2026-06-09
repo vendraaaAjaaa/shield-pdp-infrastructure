@@ -1,0 +1,16 @@
+{
+  "name": "shield-pdp-enterprise-core",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Stage 2 enterprise core services for Shield-PDP.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "express": "4.22.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

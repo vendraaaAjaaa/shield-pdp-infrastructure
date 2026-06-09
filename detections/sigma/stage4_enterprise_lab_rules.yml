@@ -1,0 +1,216 @@
+title: Shield-PDP Stage 4 Enterprise Lab Detection Rules
+status: test
+description: Sigma-style detection pack for the controlled Shield-PDP enterprise red/purple-team lab.
+rules:
+  - id: SHIELD-S4-SSRF-001
+    title: Controlled SSRF preview reached internal service
+    level: high
+    logsource:
+      product: shield-pdp
+      service: internal-api
+    detection:
+      selection:
+        event: lab.ssrf_internal_service_preview
+      condition: selection
+    tags:
+      - attack.t1190
+      - attack.t1590
+    falsepositives:
+      - Stage 3 or Stage 4 validation windows.
+    recommendation: Enforce egress policy and metadata deny rules.
+
+  - id: SHIELD-S4-METADATA-001
+    title: Internal metadata endpoint accessed
+    level: high
+    logsource:
+      product: shield-pdp
+      service: service-discovery
+    detection:
+      selection:
+        event: lab.internal_metadata_read
+      condition: selection
+    tags:
+      - attack.t1590
+      - attack.t1552
+    falsepositives:
+      - Approved platform inventory jobs.
+    recommendation: Alert on metadata reads from application preview services.
+
+  - id: SHIELD-S4-JWT-001
+    title: JWT audience confusion accepted by legacy validator
+    level: critical
+    logsource:
+      product: shield-pdp
+      service: internal-api
+    detection:
+      selection:
+        event: lab.legacy_audience_token_accepted
+      condition: selection
+    tags:
+      - attack.t1550.001
+      - attack.t1606
+    falsepositives:
+      - None expected outside controlled exercises.
+    recommendation: Validate issuer, audience, expiry, nonce, and RBAC everywhere.
+
+  - id: SHIELD-S4-JWT-002
+    title: Stale delegated token accepted
+    level: medium
+    logsource:
+      product: shield-pdp
+      service: internal-api
+    detection:
+      selection:
+        event: lab.stale_delegated_token_accepted
+      condition: selection
+    tags:
+      - attack.t1550.001
+    falsepositives:
+      - Short migration grace windows.
+    recommendation: Remove stale-token acceptance or require active introspection.
+
+  - id: SHIELD-S4-SVC-001
+    title: Service account accessed shadow administration surface
+    level: high
+    logsource:
+      product: shield-pdp
+      service: internal-api
+    detection:
+      selection:
+        event: lab.service_account_admin_shadow_access
+      condition: selection
+    tags:
+      - attack.t1078
+      - attack.t1550.001
+    falsepositives:
+      - Approved admin automation.
+    recommendation: Replace broad service roles with service-specific scopes.
+
+  - id: SHIELD-S4-CICD-001
+    title: Pipeline token exposed from repository configuration
+    level: high
+    logsource:
+      product: shield-pdp
+      service: git-sim
+    detection:
+      selection:
+        event: lab.pipeline_token_exposed
+      condition: selection
+    tags:
+      - attack.t1552
+      - attack.t1078
+    falsepositives:
+      - Synthetic training repository reads.
+    recommendation: Move CI credentials into scoped secret stores.
+
+  - id: SHIELD-S4-CICD-002
+    title: Token-only pipeline execution simulated
+    level: high
+    logsource:
+      product: shield-pdp
+      service: ci-sim
+    detection:
+      selection:
+        event: lab.poisoned_build_flow_simulated
+      condition: selection
+    tags:
+      - attack.t1195.002
+      - attack.t1078
+    falsepositives:
+      - Approved CI control testing.
+    recommendation: Require signed workload identity and repository policy checks.
+
+  - id: SHIELD-S4-ARTIFACT-001
+    title: Artifact environment metadata exposed
+    level: medium
+    logsource:
+      product: shield-pdp
+      service: artifact-store
+    detection:
+      selection:
+        event: lab.artifact_environment_exposed
+      condition: selection
+    tags:
+      - attack.t1552
+      - attack.t1082
+    falsepositives:
+      - Developer artifact provenance troubleshooting.
+    recommendation: Strip environment snapshots from broad-read artifacts.
+
+  - id: SHIELD-S4-SECRETS-001
+    title: Legacy pipeline token read deployment secret
+    level: critical
+    logsource:
+      product: shield-pdp
+      service: secrets-broker
+    detection:
+      selection:
+        event: lab.secret_legacy_token_read
+      condition: selection
+    tags:
+      - attack.t1552
+      - attack.t1528
+    falsepositives:
+      - None expected outside controlled exercises.
+    recommendation: Disable token-only secret reads.
+
+  - id: SHIELD-S4-ADMIN-001
+    title: Admin or directory route authorization failure
+    level: medium
+    logsource:
+      product: shield-pdp
+      service: auth-service
+    detection:
+      selection:
+        event: http.request
+        status_code:
+          - 401
+          - 403
+      filter_path:
+        path|contains:
+          - /directory/users
+          - /admin
+      condition: selection and filter_path
+    tags:
+      - attack.t1069
+      - attack.t1087
+    falsepositives:
+      - Users without admin rights browsing protected routes.
+    recommendation: Correlate repeated denials with reconnaissance.
+
+  - id: SHIELD-S4-PRIVESC-001
+    title: Identity abuse path indicates privilege escalation
+    level: high
+    logsource:
+      product: shield-pdp
+    detection:
+      selection:
+        event:
+          - lab.legacy_audience_token_accepted
+          - lab.service_account_admin_shadow_access
+      condition: selection
+    tags:
+      - attack.t1550.001
+      - attack.t1078
+    falsepositives:
+      - Purple-team validation only.
+    recommendation: Centralize delegated-token validation and service account authorization.
+
+  - id: SHIELD-S4-RECON-001
+    title: Internal service discovery reconnaissance
+    level: medium
+    logsource:
+      product: shield-pdp
+      service: service-discovery
+    detection:
+      selection:
+        event:
+          - lab.service_discovery_dns_recon
+          - lab.service_discovery_map_recon
+      condition: selection
+    tags:
+      - attack.t1590
+      - attack.t1046
+    falsepositives:
+      - SOC investigation or service catalog sync.
+    recommendation: Alert when discovery is followed by metadata, CI, or secret access.

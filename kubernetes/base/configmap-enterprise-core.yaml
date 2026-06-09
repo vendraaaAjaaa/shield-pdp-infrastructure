@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shield-enterprise-core-config
+  namespace: shield-intelligence
+  labels:
+    app.kubernetes.io/name: shield-pdp
+    shield.stage: stage7
+data:
+  NODE_ENV: production
+  PORT: "8080"
+  ENTERPRISE_JWT_ISSUER: shield-pdp-enterprise
+  ENTERPRISE_JWT_AUDIENCE: shield-pdp-internal
+  AUTH_SERVICE_URL: http://auth-service.shield-identity.svc.cluster.local:8080
+  LOG_COLLECTOR_URL: http://log-collector.shield-observability.svc.cluster.local:8080
+  STAGE3_TARGETS_ENABLED: "true"
+  STAGE4_TARGETS_ENABLED: "true"
+  STAGE5_TARGETS_ENABLED: "true"
+  STAGE6_TARGETS_ENABLED: "true"
+  STAGE7_TARGETS_ENABLED: "true"

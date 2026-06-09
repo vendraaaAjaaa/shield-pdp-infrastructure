@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: shield-pdp-stage7-local
+  namespace: argocd
+  labels:
+    shield.stage: stage7
+spec:
+  project: default
+  source:
+    repoURL: https://example.invalid/internal/shield-pdp-ecosystem.git
+    targetRevision: main
+    path: kubernetes/overlays/local
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: shield-intelligence
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+    automated: null

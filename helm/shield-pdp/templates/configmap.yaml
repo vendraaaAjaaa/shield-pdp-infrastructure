@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "shield-pdp.name" . }}-config
+  namespace: shield-intelligence
+  labels:
+    {{- include "shield-pdp.labels" . | nindent 4 }}
+data:
+  NODE_ENV: production
+  PORT: {{ .Values.enterpriseCore.port | quote }}
+  ENTERPRISE_JWT_ISSUER: {{ .Values.config.issuer | quote }}
+  ENTERPRISE_JWT_AUDIENCE: {{ .Values.config.audience | quote }}
+  AUTH_SERVICE_URL: http://auth-service.shield-identity.svc.cluster.local:8080
+  LOG_COLLECTOR_URL: http://log-collector.shield-observability.svc.cluster.local:8080
+  STAGE3_TARGETS_ENABLED: {{ .Values.config.stage3TargetsEnabled | quote }}
+  STAGE4_TARGETS_ENABLED: {{ .Values.config.stage4TargetsEnabled | quote }}
+  STAGE5_TARGETS_ENABLED: {{ .Values.config.stage5TargetsEnabled | quote }}
+  STAGE6_TARGETS_ENABLED: {{ .Values.config.stage6TargetsEnabled | quote }}
+  STAGE7_TARGETS_ENABLED: {{ .Values.config.stage7TargetsEnabled | quote }}

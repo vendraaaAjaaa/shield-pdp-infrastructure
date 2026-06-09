@@ -1,0 +1,6 @@
+apiVersion: v2
+name: shield-pdp
+description: Shield-PDP enterprise cyber range Stage 7 deployment chart
+type: application
+version: 0.7.0
+appVersion: "7.0.0"

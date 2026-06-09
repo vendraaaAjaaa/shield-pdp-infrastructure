@@ -1,0 +1,45 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: shield-intelligence-default-deny
+  namespace: shield-intelligence
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: shield-intelligence-allow-observability
+  namespace: shield-intelligence
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: shield-pdp
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              shield.zone: observability
+        - namespaceSelector:
+            matchLabels:
+              shield.zone: edge
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              shield.zone: observability
+        - namespaceSelector:
+            matchLabels:
+              shield.zone: identity
+      ports:
+        - protocol: TCP
+          port: 8080

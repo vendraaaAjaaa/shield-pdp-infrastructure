@@ -1,0 +1,148 @@
+title: Shield-PDP Stage 6 Intelligence and Digital Twin Detection Rules
+status: test
+description: Sigma-style detection pack for controlled Stage 6 enterprise intelligence, digital twin, attack graph, hunting, coverage, chaos, and replay workflows.
+rules:
+  - id: SHIELD-S6-DIGITAL-TWIN-001
+    title: Synthetic off-hours enterprise activity generated
+    level: medium
+    logsource:
+      product: shield-pdp
+      service: digital-twin
+    detection:
+      selection:
+        event: digital_twin.off_hours_activity
+      condition: selection
+    tags:
+      - attack.t1078
+      - attack.t1029
+    falsepositives:
+      - Expected during Stage 6 digital twin generation.
+    recommendation: Use as a behavioral baseline and confirm synthetic_background_activity=true.
+
+  - id: SHIELD-S6-ATTACK-GRAPH-001
+    title: Dynamic attack graph identified privilege paths
+    level: high
+    logsource:
+      product: shield-pdp
+      service: attack-graph
+    detection:
+      selection:
+        event:
+          - stage6.attack_graph.generated
+          - stage6.attack_graph.privilege_path_analysis
+      condition: selection
+    tags:
+      - attack.t1069
+      - attack.t1087
+      - attack.t1021
+    falsepositives:
+      - Expected graph generation and SOC visualization.
+    recommendation: Review service-account and CI/CD trust paths.
+
+  - id: SHIELD-S6-AUTO-CAMPAIGN-001
+    title: Controlled autonomous campaign phase or completion
+    level: high
+    logsource:
+      product: shield-pdp
+      service: campaign-orchestrator
+    detection:
+      selection:
+        event:
+          - stage6.campaign.phase_completed
+          - stage6.campaign.completed
+      condition: selection
+    tags:
+      - attack.t1550.001
+      - attack.t1195.002
+      - attack.t1552
+      - attack.t1041
+    falsepositives:
+      - Approved Stage 6 campaign orchestration.
+    recommendation: Validate replay export and coverage for every phase.
+
+  - id: SHIELD-S6-HUNT-001
+    title: Threat hunting query executed against telemetry
+    level: medium
+    logsource:
+      product: shield-pdp
+      service: threat-hunting
+    detection:
+      selection:
+        event: stage6.hunt.query_executed
+      condition: selection
+    tags:
+      - attack.t1087
+      - attack.t1069
+    falsepositives:
+      - SOC and threat-hunting exercises.
+    recommendation: Track query context and analyst identity for reproducibility.
+
+  - id: SHIELD-S6-COVERAGE-001
+    title: Detection coverage blindspot analysis generated
+    level: medium
+    logsource:
+      product: shield-pdp
+      service: coverage-intel
+    detection:
+      selection:
+        event:
+          - stage6.coverage.analysis_generated
+          - stage6.coverage.blindspot_identified
+      condition: selection
+    tags:
+      - attack.t1082
+    falsepositives:
+      - Coverage intelligence reporting.
+    recommendation: Prioritize blindspots with high-value service blast radius.
+
+  - id: SHIELD-S6-CHAOS-001
+    title: Security chaos simulation injected
+    level: high
+    logsource:
+      product: shield-pdp
+      service: chaos-sim
+    detection:
+      selection:
+        event:
+          - stage6.chaos.injected
+          - stage6.chaos.telemetry_drop_simulated
+          - stage6.chaos.logging_degradation_simulated
+      condition: selection
+    tags:
+      - attack.t1562.008
+      - attack.t1499
+    falsepositives:
+      - Scheduled resilience exercises.
+    recommendation: Confirm reversion telemetry and SIEM visibility under degraded conditions.
+
+  - id: SHIELD-S6-REPLAY-001
+    title: Time-travel forensic reconstruction completed
+    level: medium
+    logsource:
+      product: shield-pdp
+      service: intelligence-dashboard
+    detection:
+      selection:
+        event: stage6.replay.reconstruction_completed
+      condition: selection
+    tags:
+      - attack.t1082
+    falsepositives:
+      - Forensic reconstruction and replay validation.
+    recommendation: Verify deterministic replay metadata and detection-flow consistency.
+
+  - id: SHIELD-S6-AI-DEFENSE-001
+    title: Defensive analysis summary generated
+    level: low
+    logsource:
+      product: shield-pdp
+      service: intelligence-dashboard
+    detection:
+      selection:
+        event: stage6.ai.defensive_summary_generated
+      condition: selection
+    tags:
+      - attack.t1082
+    falsepositives:
+      - Defensive explainable analysis workflows.
+    recommendation: Confirm analysis remains defensive and does not generate exploit content.

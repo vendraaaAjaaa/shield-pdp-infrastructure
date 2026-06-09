@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: shield-edge
+  labels:
+    shield.zone: edge
+    shield.stage: stage7
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: shield-identity
+  labels:
+    shield.zone: identity
+    shield.stage: stage7
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: shield-enterprise
+  labels:
+    shield.zone: enterprise
+    shield.stage: stage7
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: shield-devops
+  labels:
+    shield.zone: devops
+    shield.stage: stage7
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: shield-observability
+  labels:
+    shield.zone: observability
+    shield.stage: stage7
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: shield-intelligence
+  labels:
+    shield.zone: intelligence
+    shield.stage: stage7

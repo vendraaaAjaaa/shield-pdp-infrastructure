@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.enterpriseCore.serviceName }}
+  namespace: shield-intelligence
+  labels:
+    {{- include "shield-pdp.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: {{ include "shield-pdp.name" . }}
+    app.kubernetes.io/component: enterprise-core
+  ports:
+    - name: http
+      port: {{ .Values.enterpriseCore.port }}
+      targetPort: http

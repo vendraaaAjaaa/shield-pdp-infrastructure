@@ -1,0 +1,86 @@
+title: Shield-PDP Blocked Object Authorization Probe
+id: 5a8e4b7d-8f9c-4c11-9234-567890abcdef
+status: stable
+description: Detects blocked IDOR/BOLA probes against profile or account objects through the Shield-PDP gateway.
+author: Shield-PDP SOC Team
+date: 2026/05/24
+tags:
+  - attack.initial_access
+  - attack.privilege_escalation
+  - owasp.api1
+logsource:
+  product: nginx
+  service: shield_pdp_gateway
+  definition: JSON access logs emitted by infrastructure/networks/nginx.conf
+detection:
+  selection_path:
+    uri|contains:
+      - '/api/v1/vulnerable/profiles/'
+      - '/api/v1/vulnerable/accounts/'
+  selection_blocked:
+    status: 403
+  condition: selection_path and selection_blocked
+fields:
+  - timestamp
+  - remote_addr
+  - request_id
+  - method
+  - uri
+  - status
+  - upstream_status
+  - request_time
+falsepositives:
+  - Authorized security validation runs
+level: high
+---
+title: Shield-PDP Unauthorized Admin Route Probe
+id: 2b9f4c8e-9d0a-4b21-8877-654321fedcba
+status: stable
+description: Detects non-admin attempts to access administrative APIs.
+author: Shield-PDP SOC Team
+date: 2026/05/24
+tags:
+  - attack.collection
+  - owasp.api5
+logsource:
+  product: nginx
+  service: shield_pdp_gateway
+detection:
+  selection:
+    uri|contains: '/api/v1/vulnerable/admin/'
+    status: 403
+  condition: selection
+fields:
+  - timestamp
+  - remote_addr
+  - request_id
+  - method
+  - uri
+  - status
+level: critical
+---
+title: Shield-PDP API Upstream Failure
+id: 61f1f1cf-2011-40f4-b8c7-a306b32492ad
+status: stable
+description: Detects gateway 5xx responses that indicate API startup, routing, or dependency failures.
+author: Shield-PDP SOC Team
+date: 2026/05/24
+tags:
+  - reliability.api
+  - soc.monitoring
+logsource:
+  product: nginx
+  service: shield_pdp_gateway
+detection:
+  selection:
+    status|gte: 500
+  condition: selection
+fields:
+  - timestamp
+  - remote_addr
+  - request_id
+  - uri
+  - status
+  - upstream_status
+  - request_time
+level: high

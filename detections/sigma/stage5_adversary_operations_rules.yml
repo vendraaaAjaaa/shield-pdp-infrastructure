@@ -1,0 +1,137 @@
+title: Shield-PDP Stage 5 Adversary Operations Detection Rules
+status: test
+description: Sigma-style detection pack for controlled, safe adversary operation simulation telemetry in Shield-PDP.
+rules:
+  - id: SHIELD-S5-BEACON-001
+    title: Controlled beacon heartbeat or task activity
+    level: high
+    logsource:
+      product: shield-pdp
+      service: beacon-sim
+    detection:
+      selection:
+        event:
+          - adversary.beacon.heartbeat
+          - adversary.beacon.task_polled
+          - adversary.beacon.task_result
+      condition: selection
+    tags:
+      - attack.t1071.001
+      - attack.t1059
+    falsepositives:
+      - Approved Stage 5 adversary simulation windows.
+    recommendation: Correlate callback timing, operator identity, and task type; confirm command execution remains synthetic.
+
+  - id: SHIELD-S5-REDIRECTOR-001
+    title: Redirector traffic shaping simulation
+    level: medium
+    logsource:
+      product: shield-pdp
+      service: redirector-sim
+    detection:
+      selection:
+        event:
+          - adversary.redirector.route_selected
+          - adversary.redirector.traffic_shaped
+      condition: selection
+    tags:
+      - attack.t1090
+      - attack.t1029
+      - attack.t1071.001
+    falsepositives:
+      - Approved route validation and traffic-shaping exercises.
+    recommendation: Preserve gateway traces and alert when route profiles run outside exercise windows.
+
+  - id: SHIELD-S5-PIVOT-001
+    title: Lateral movement path simulated across trust boundaries
+    level: high
+    logsource:
+      product: shield-pdp
+      service: pivot-sim
+    detection:
+      selection:
+        event:
+          - adversary.pivot.simulated
+          - adversary.lateral_movement.simulated
+      condition: selection
+    tags:
+      - attack.t1021
+      - attack.t1078
+      - attack.t1550.001
+    falsepositives:
+      - Approved purple-team path replay.
+    recommendation: Review trust-boundary crossings and service account scopes touched by the simulated route.
+
+  - id: SHIELD-S5-PERSIST-001
+    title: Reversible persistence mechanism registered in simulation
+    level: high
+    logsource:
+      product: shield-pdp
+      service: persistence-sim
+    detection:
+      selection:
+        event: adversary.persistence.registered
+      condition: selection
+    tags:
+      - attack.t1053.005
+      - attack.t1547
+      - attack.t1543
+      - attack.t1550.001
+    falsepositives:
+      - Expected Stage 5 persistence visibility exercises.
+    recommendation: Verify cleanup completion and confirm no real system-level persistence was created.
+
+  - id: SHIELD-S5-OPSEC-001
+    title: Low-noise OPSEC profile used
+    level: medium
+    logsource:
+      product: shield-pdp
+      service: adversary-control
+    detection:
+      selection:
+        event: adversary.opsec.low_noise_profile_used
+      condition: selection
+    tags:
+      - attack.t1029
+      - attack.t1071.001
+    falsepositives:
+      - Red-team timing profile validation.
+    recommendation: Compare timing profile with business-hour baselines while ensuring telemetry remains complete.
+
+  - id: SHIELD-S5-CAMPAIGN-001
+    title: Adversary operation campaign completed
+    level: high
+    logsource:
+      product: shield-pdp
+      service: adversary-control
+    detection:
+      selection:
+        event: adversary.operation.completed
+      condition: selection
+    tags:
+      - attack.t1550.001
+      - attack.t1078
+      - attack.t1590
+      - attack.t1552
+      - attack.t1119
+    falsepositives:
+      - Approved controlled campaign execution.
+    recommendation: Open an exercise incident and compare generated detections to expected coverage.
+
+  - id: SHIELD-S5-REPLAY-001
+    title: Adversary replay emitted controlled timeline
+    level: medium
+    logsource:
+      product: shield-pdp
+      service: adversary-control
+    detection:
+      selection:
+        event: adversary.replay.started
+      condition: selection
+    tags:
+      - attack.t1071.001
+      - attack.t1021
+      - attack.t1053.005
+    falsepositives:
+      - Expected SOC replay workflow.
+    recommendation: Use replay ID to confirm alert ordering, notes, and incident reconstruction integrity.

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shield-PDP Red Team Token Helper</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            --bg: #111827;
+            --panel: #18212f;
+            --panel-2: #202b3a;
+            --line: #334155;
+            --text: #e5e7eb;
+            --muted: #9ca3af;
+            --good: #22c55e;
+            --bad: #ef4444;
+            --info: #38bdf8;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: var(--bg);
+            color: var(--text);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            align-items: center;
+            padding: 20px 28px;
+            border-bottom: 1px solid var(--line);
+            background: #0f1720;
+        }
+        main {
+            width: min(1180px, 100%);
+            margin: 0 auto;
+            padding: 24px;
+            display: grid;
+            grid-template-columns: minmax(300px, 420px) 1fr;
+            gap: 18px;
+        }
+        h1, h2, p { margin: 0; }
+        h1 { font-size: 22px; }
+        h2 { font-size: 16px; margin-bottom: 14px; }
+        a { color: var(--info); text-decoration: none; }
+        .subtitle { color: var(--muted); margin-top: 4px; font-size: 13px; }
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 18px;
+        }
+        label { display: block; color: var(--muted); font-size: 13px; margin-bottom: 6px; }
+        input {
+            width: 100%;
+            height: 40px;
+            border: 1px solid var(--line);
+            border-radius: 6px;
+            background: #0f1720;
+            color: var(--text);
+            padding: 8px 10px;
+            font-size: 14px;
+        }
+        .field { margin-bottom: 12px; }
+        .row { display: flex; gap: 10px; flex-wrap: wrap; }
+        button {
+            min-height: 38px;
+            border: 1px solid var(--line);
+            border-radius: 6px;
+            background: var(--panel-2);
+            color: var(--text);
+            padding: 8px 12px;
+            cursor: pointer;
+            font-weight: 700;
+        }
+        button.primary { background: #075985; border-color: #0ea5e9; }
+        button.good { background: #14532d; border-color: #22c55e; }
+        button.bad { background: #7f1d1d; border-color: #ef4444; }
+        pre {
+            white-space: pre-wrap;
+            word-break: break-word;
+            margin: 0;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid var(--line);
+            background: #0f1720;
+            color: #d1d5db;
+            font-size: 12px;
+            line-height: 1.45;
+        }
+        .grid { display: grid; gap: 14px; }
+        .status { margin-top: 12px; color: var(--muted); font-size: 13px; }
+        .status.ok { color: #86efac; }
+        .status.fail { color: #fca5a5; }
+        .endpoint {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 8px;
+            align-items: center;
+            padding: 10px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: var(--panel-2);
+        }
+        .endpoint code { color: #d1d5db; overflow-wrap: anywhere; }
+        @media (max-width: 860px) {
+            main { grid-template-columns: 1fr; padding: 16px; }
+            header { align-items: flex-start; flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div>
+            <h1>Shield-PDP Red Team Token Helper</h1>
+            <p class="subtitle">Login token disimpan di browser localStorage untuk dipakai di BurpSuite.</p>
+        </div>
+        <a href="/">Dashboard</a>
+    </header>
+
+    <main>
+        <section class="panel">
+            <h2>Login</h2>
+            <div class="field">
+                <label for="username">Username</label>
+                <input id="username" value="alice" autocomplete="username">
+            </div>
+            <div class="field">
+                <label for="password">Password</label>
+                <input id="password" value="password123" type="password" autocomplete="current-password">
+            </div>
+            <div class="row">
+                <button class="primary" id="loginAlice">Login Alice</button>
+                <button id="loginAdmin">Login Admin</button>
+                <button class="bad" id="clearTokens">Clear</button>
+            </div>
+            <p id="status" class="status">Belum login.</p>
+        </section>
+
+        <section class="panel grid">
+            <div>
+                <h2>Authorization Header</h2>
+                <pre id="authHeader">Authorization: Bearer &lt;belum ada token&gt;</pre>
+            </div>
+            <div class="row">
+                <button class="good" id="copyHeader">Copy Header</button>
+                <button id="copyToken">Copy Token Only</button>
+            </div>
+            <div>
+                <h2>Access Token</h2>
+                <pre id="accessToken">-</pre>
+            </div>
+            <div>
+                <h2>Refresh Token</h2>
+                <pre id="refreshToken">-</pre>
+            </div>
+        </section>
+
+        <section class="panel grid" style="grid-column: 1 / -1;">
+            <h2>Burp Repeater Targets</h2>
+            <div class="endpoint"><code>GET /api/v1/vulnerable/lab/idor/profiles/2</code><button data-path="/api/v1/vulnerable/lab/idor/profiles/2">Open</button></div>
+            <div class="endpoint"><code>GET /api/v1/vulnerable/lab/bola/accounts/2</code><button data-path="/api/v1/vulnerable/lab/bola/accounts/2">Open</button></div>
+            <div class="endpoint"><code>GET /api/v1/vulnerable/profiles/2</code><button data-path="/api/v1/vulnerable/profiles/2">Open</button></div>
+            <div class="endpoint"><code>GET /api/v1/vulnerable/accounts/2</code><button data-path="/api/v1/vulnerable/accounts/2">Open</button></div>
+            <div class="endpoint"><code>GET /api/v1/vulnerable/admin/users</code><button data-path="/api/v1/vulnerable/admin/users">Open</button></div>
+        </section>
+    </main>
+
+    <script>
+        const apiBase = '/api/v1/vulnerable';
+        const tokenKey = 'shield_pdp_access_token';
+        const refreshKey = 'shield_pdp_refresh_token';
+        const userKey = 'shield_pdp_username';
+
+        function qs(id) { return document.getElementById(id); }
+
+        function setStatus(text, ok = true) {
+            const el = qs('status');
+            el.textContent = text;
+            el.className = ok ? 'status ok' : 'status fail';
+        }
+
+        function currentAccessToken() {
+            return localStorage.getItem(tokenKey) || '';
+        }
+
+        function renderTokens() {
+            const access = currentAccessToken();
+            const refresh = localStorage.getItem(refreshKey) || '';
+            qs('authHeader').textContent = access ? `Authorization: Bearer ${access}` : 'Authorization: Bearer <belum ada token>';
+            qs('accessToken').textContent = access || '-';
+            qs('refreshToken').textContent = refresh || '-';
+            const storedUser = localStorage.getItem(userKey);
+            if (access && storedUser) setStatus(`Token aktif untuk ${storedUser}.`, true);
+        }
+
+        async function login(username, password) {
+            const body = new URLSearchParams({ username, password });
+            const response = await fetch(`${apiBase}/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
+                body
+            });
+            const payload = await response.json();
+            if (!response.ok) throw new Error(payload.detail || `HTTP ${response.status}`);
+            localStorage.setItem(tokenKey, payload.access_token);
+            localStorage.setItem(refreshKey, payload.refresh_token);
+            localStorage.setItem(userKey, username);
+            renderTokens();
+            setStatus(`Login sukses sebagai ${username}.`, true);
+        }
+
+        async function copyText(text) {
+            if (!text) return;
+            await navigator.clipboard.writeText(text);
+            setStatus('Copied ke clipboard.', true);
+        }
+
+        qs('loginAlice').addEventListener('click', async () => {
+            qs('username').value = 'alice';
+            qs('password').value = 'password123';
+            try { await login('alice', 'password123'); } catch (error) { setStatus(error.message, false); }
+        });
+
+        qs('loginAdmin').addEventListener('click', async () => {
+            qs('username').value = 'admin';
+            qs('password').value = 'admin12345';
+            try { await login('admin', 'admin12345'); } catch (error) { setStatus(error.message, false); }
+        });
+
+        qs('clearTokens').addEventListener('click', () => {
+            localStorage.removeItem(tokenKey);
+            localStorage.removeItem(refreshKey);
+            localStorage.removeItem(userKey);
+            renderTokens();
+            setStatus('Token dihapus.', true);
+        });
+
+        qs('copyHeader').addEventListener('click', () => copyText(qs('authHeader').textContent));
+        qs('copyToken').addEventListener('click', () => copyText(currentAccessToken()));
+
+        document.querySelectorAll('[data-path]').forEach(button => {
+            button.addEventListener('click', async () => {
+                const token = currentAccessToken();
+                if (!token) {
+                    setStatus('Login dulu supaya request punya Authorization header.', false);
+                    return;
+                }
+                const response = await fetch(button.dataset.path, {
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+                });
+                const text = await response.text();
+                const popup = window.open('', '_blank');
+                popup.document.write(`<pre>${button.dataset.path}\nHTTP ${response.status}\n\n${text.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</pre>`);
+                popup.document.close();
+            });
+        });
+
+        renderTokens();
+    </script>
+</body>
+</html>

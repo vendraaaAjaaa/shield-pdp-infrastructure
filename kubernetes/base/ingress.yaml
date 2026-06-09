@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: shield-stage7-ingress
+  namespace: shield-edge
+  labels:
+    app.kubernetes.io/name: shield-pdp
+    shield.stage: stage7
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 1m
+    nginx.ingress.kubernetes.io/enable-access-log: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: shield-pdp.local
+      http:
+        paths:
+          - path: /scale/
+            pathType: Prefix
+            backend:
+              service:
+                name: scale-dashboard
+                port:
+                  number: 8080

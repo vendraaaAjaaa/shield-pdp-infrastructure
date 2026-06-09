@@ -1,0 +1,41 @@
+global:
+  stage: stage7
+  image:
+    repository: shield-pdp-enterprise-core
+    tag: stage7
+    pullPolicy: IfNotPresent
+
+enterpriseCore:
+  replicas: 2
+  serviceMode: scale-dashboard
+  serviceName: scale-dashboard
+  serviceAccountId: scale-dashboard
+  port: 8080
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 750m
+      memory: 768Mi
+
+config:
+  issuer: shield-pdp-enterprise
+  audience: shield-pdp-internal
+  stage3TargetsEnabled: "true"
+  stage4TargetsEnabled: "true"
+  stage5TargetsEnabled: "true"
+  stage6TargetsEnabled: "true"
+  stage7TargetsEnabled: "true"
+
+ingress:
+  enabled: true
+  className: nginx
+  host: shield-pdp.local
+  path: /scale/
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  averageCpuUtilization: 70

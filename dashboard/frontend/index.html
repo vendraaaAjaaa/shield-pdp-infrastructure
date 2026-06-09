@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shield-PDP SOC Dashboard</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            --bg: #111827;
+            --panel: #18212f;
+            --panel-2: #202b3a;
+            --line: #334155;
+            --text: #e5e7eb;
+            --muted: #9ca3af;
+            --good: #22c55e;
+            --warn: #f59e0b;
+            --bad: #ef4444;
+            --info: #38bdf8;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: var(--bg);
+            color: var(--text);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            letter-spacing: 0;
+        }
+        header {
+            min-height: 88px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
+            padding: 20px 28px;
+            border-bottom: 1px solid var(--line);
+            background: #0f1720;
+        }
+        h1, h2, h3, p { margin: 0; }
+        h1 { font-size: 24px; font-weight: 800; }
+        h2 { font-size: 26px; font-weight: 800; }
+        h3 { font-size: 15px; font-weight: 700; color: var(--text); }
+        .subtitle { margin-top: 4px; color: var(--muted); font-size: 12px; text-transform: uppercase; }
+        .status-strip { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+        .pill {
+            min-height: 30px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            color: var(--muted);
+            background: #121a26;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+        .ok .dot { background: var(--good); }
+        .warn .dot { background: var(--warn); }
+        .fail .dot { background: var(--bad); }
+        main {
+            width: min(1440px, 100%);
+            margin: 0 auto;
+            padding: 24px;
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 16px;
+        }
+        .metric-grid {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 16px;
+        }
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 18px;
+        }
+        .metric-label { color: var(--muted); font-size: 13px; }
+        .metric-value { margin-top: 8px; font-size: 34px; line-height: 1; font-weight: 800; }
+        .metric-foot { margin-top: 12px; color: var(--muted); font-size: 12px; }
+        .bar { height: 8px; margin-top: 14px; background: #0f1720; border-radius: 999px; overflow: hidden; }
+        .fill { height: 100%; width: 0%; background: var(--info); transition: width 300ms ease; }
+        .risk .fill, .risk .metric-value { color: var(--warn); background: var(--warn); }
+        .compliance .fill, .compliance .metric-value { color: var(--good); background: var(--good); }
+        .chart-panel { grid-column: span 7; min-height: 390px; }
+        .control-panel { grid-column: span 5; min-height: 390px; }
+        .feed-panel { grid-column: span 7; min-height: 300px; }
+        .api-panel { grid-column: span 5; min-height: 300px; }
+        canvas { width: 100%; height: 310px; display: block; margin-top: 18px; }
+        .list { margin-top: 14px; display: grid; gap: 10px; }
+        .row {
+            display: grid;
+            grid-template-columns: 12px 1fr auto;
+            gap: 10px;
+            align-items: start;
+            padding: 12px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: var(--panel-2);
+        }
+        .severity { width: 10px; height: 10px; border-radius: 50%; margin-top: 4px; background: var(--info); }
+        .severity.high { background: var(--warn); }
+        .severity.critical { background: var(--bad); }
+        .row-title { font-size: 14px; font-weight: 750; }
+        .row-detail { margin-top: 4px; font-size: 12px; color: var(--muted); line-height: 1.45; }
+        .row-time { color: var(--muted); font-size: 12px; white-space: nowrap; }
+        .control {
+            padding: 14px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: var(--panel-2);
+        }
+        .control-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .badge { padding: 4px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; text-transform: uppercase; }
+        .badge.healthy { background: rgba(34, 197, 94, 0.14); color: #86efac; border: 1px solid rgba(34, 197, 94, 0.35); }
+        .badge.degraded { background: rgba(245, 158, 11, 0.14); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.35); }
+        .kv {
+            display: grid;
+            grid-template-columns: 150px 1fr;
+            gap: 8px 12px;
+            margin-top: 14px;
+            font-size: 13px;
+        }
+        .kv dt { color: var(--muted); }
+        .kv dd { margin: 0; overflow-wrap: anywhere; }
+        @media (max-width: 980px) {
+            header { align-items: flex-start; flex-direction: column; }
+            .status-strip { justify-content: flex-start; }
+            main { padding: 16px; }
+            .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .chart-panel, .control-panel, .feed-panel, .api-panel { grid-column: 1 / -1; }
+        }
+        @media (max-width: 600px) {
+            .metric-grid { grid-template-columns: 1fr; }
+            .kv { grid-template-columns: 1fr; }
+            .row { grid-template-columns: 12px 1fr; }
+            .row-time { grid-column: 2; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div>
+            <h1>Shield-PDP</h1>
+            <p class="subtitle">Enterprise SOC and UU PDP control dashboard</p>
+        </div>
+        <div class="status-strip">
+            <span id="apiStatus" class="pill warn"><span class="dot"></span>API checking</span>
+            <span id="dbStatus" class="pill warn"><span class="dot"></span>Database checking</span>
+            <span id="lastUpdated" class="pill"><span class="dot"></span>Not updated</span>
+        </div>
+    </header>
+
+    <main>
+        <section class="metric-grid">
+            <article class="panel risk">
+                <p class="metric-label">Residual Risk Score</p>
+                <h2 id="riskScore" class="metric-value">--</h2>
+                <div class="bar"><div id="riskBar" class="fill"></div></div>
+                <p class="metric-foot">Lower is better after remediation</p>
+            </article>
+            <article class="panel compliance">
+                <p class="metric-label">UU PDP Compliance</p>
+                <h2 id="complianceScore" class="metric-value">--</h2>
+                <div class="bar"><div id="complianceBar" class="fill"></div></div>
+                <p class="metric-foot">Mapped to technical controls</p>
+            </article>
+            <article class="panel">
+                <p class="metric-label">Active Security Events</p>
+                <h2 id="incidentCount" class="metric-value">--</h2>
+                <p class="metric-foot">Audit denials recorded by API</p>
+            </article>
+            <article class="panel">
+                <p class="metric-label">Protected Demo Records</p>
+                <h2 id="recordCount" class="metric-value">--</h2>
+                <p class="metric-foot">Seeded identities under RBAC</p>
+            </article>
+        </section>
+
+        <section class="panel chart-panel">
+            <h3>Blocked Attack Timeline</h3>
+            <canvas id="attackChart" width="900" height="320" aria-label="Blocked attack timeline"></canvas>
+        </section>
+
+        <section class="panel control-panel">
+            <h3>Security Controls</h3>
+            <div id="controls" class="list"></div>
+        </section>
+
+        <section class="panel feed-panel">
+            <h3>Live SOC Feed</h3>
+            <div id="incidents" class="list"></div>
+        </section>
+
+        <section class="panel api-panel">
+            <h3>Runtime Evidence</h3>
+            <dl class="kv">
+                <dt>Gateway</dt><dd id="gatewayEvidence">localhost:3000</dd>
+                <dt>Health</dt><dd id="healthEvidence">pending</dd>
+                <dt>Readiness</dt><dd id="readyEvidence">pending</dd>
+                <dt>Correlation</dt><dd id="correlationEvidence">pending</dd>
+            </dl>
+        </section>
+    </main>
+
+    <script>
+        const apiBase = '/api/v1/vulnerable';
+        const fallback = {
+            risk_score: 100,
+            compliance_score: 0,
+            active_incidents: 0,
+            protected_records: 0,
+            services: { api: 'unreachable', database: 'unknown', gateway: 'ready' },
+            controls: [
+                { name: 'Backend integration', status: 'degraded', detail: 'Dashboard cannot reach the API gateway' }
+            ],
+            incidents: [
+                { time: new Date().toLocaleTimeString(), severity: 'critical', title: 'API unavailable', detail: 'Health or readiness request failed' }
+            ]
+        };
+
+        function setPill(id, state, text) {
+            const el = document.getElementById(id);
+            el.className = `pill ${state}`;
+            el.innerHTML = `<span class="dot"></span>${text}`;
+        }
+
+        function updateMetric(id, value, suffix = '') {
+            document.getElementById(id).textContent = value === null || value === undefined ? '--' : `${value}${suffix}`;
+        }
+
+        function renderControls(controls) {
+            const root = document.getElementById('controls');
+            root.innerHTML = controls.map(control => `
+                <div class="control">
+                    <div class="control-top">
+                        <p class="row-title">${control.name}</p>
+                        <span class="badge ${control.status}">${control.status}</span>
+                    </div>
+                    <p class="row-detail">${control.detail}</p>
+                </div>
+            `).join('');
+        }
+
+        function renderIncidents(incidents) {
+            const root = document.getElementById('incidents');
+            root.innerHTML = incidents.map(item => `
+                <div class="row">
+                    <span class="severity ${item.severity}"></span>
+                    <div>
+                        <p class="row-title">${item.title}</p>
+                        <p class="row-detail">${item.detail}</p>
+                    </div>
+                    <span class="row-time">${item.time}</span>
+                </div>
+            `).join('');
+        }
+
+        function renderChart(score) {
+            const canvas = document.getElementById('attackChart');
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+            ctx.clearRect(0, 0, width, height);
+            ctx.fillStyle = '#18212f';
+            ctx.fillRect(0, 0, width, height);
+            const values = [3, 7, 4, 14, 9, 5, Math.max(2, Math.round(score / 12))];
+            const labels = ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', 'Now'];
+            const max = Math.max(...values, 16);
+            const pad = 42;
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 1;
+            ctx.font = '12px system-ui';
+            ctx.fillStyle = '#9ca3af';
+            for (let i = 0; i <= 4; i += 1) {
+                const y = pad + ((height - pad * 2) * i / 4);
+                ctx.beginPath();
+                ctx.moveTo(pad, y);
+                ctx.lineTo(width - pad, y);
+                ctx.stroke();
+                ctx.fillText(String(Math.round(max - (max * i / 4))), 8, y + 4);
+            }
+            const points = values.map((value, index) => {
+                const x = pad + ((width - pad * 2) * index / (values.length - 1));
+                const y = height - pad - ((height - pad * 2) * value / max);
+                return [x, y];
+            });
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            points.forEach(([x, y], index) => index ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
+            ctx.stroke();
+            points.forEach(([x, y], index) => {
+                ctx.fillStyle = index === points.length - 1 ? '#22c55e' : '#38bdf8';
+                ctx.beginPath();
+                ctx.arc(x, y, 5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#9ca3af';
+                ctx.fillText(labels[index], x - 16, height - 12);
+            });
+        }
+
+        async function fetchJson(path) {
+            const response = await fetch(`${apiBase}${path}`, { headers: { 'X-Request-ID': crypto.randomUUID() } });
+            const requestId = response.headers.get('x-request-id');
+            if (!response.ok) throw new Error(`${path} returned ${response.status}`);
+            const body = await response.json();
+            return { body, requestId };
+        }
+
+        async function loadDashboard() {
+            let summary = fallback;
+            try {
+                const health = await fetchJson('/health');
+                document.getElementById('healthEvidence').textContent = `${health.body.status} at ${health.body.timestamp}`;
+                document.getElementById('correlationEvidence').textContent = health.requestId || 'missing';
+                setPill('apiStatus', 'ok', 'API healthy');
+
+                const ready = await fetchJson('/ready');
+                document.getElementById('readyEvidence').textContent = `${ready.body.database}; users=${ready.body.seeded_users}`;
+                setPill('dbStatus', 'ok', 'Database ready');
+
+                summary = (await fetchJson('/dashboard/summary')).body;
+            } catch (error) {
+                document.getElementById('healthEvidence').textContent = error.message;
+                document.getElementById('readyEvidence').textContent = 'unavailable';
+                document.getElementById('correlationEvidence').textContent = 'unavailable';
+                setPill('apiStatus', 'fail', 'API offline');
+                setPill('dbStatus', 'warn', 'Database unknown');
+            }
+            updateMetric('riskScore', summary.risk_score, '/100');
+            updateMetric('complianceScore', summary.compliance_score, '%');
+            updateMetric('incidentCount', summary.active_incidents);
+            updateMetric('recordCount', summary.protected_records);
+            document.getElementById('riskBar').style.width = `${summary.risk_score}%`;
+            document.getElementById('complianceBar').style.width = `${summary.compliance_score}%`;
+            renderControls(summary.controls);
+            renderIncidents(summary.incidents);
+            renderChart(summary.risk_score);
+            setPill('lastUpdated', 'ok', new Date().toLocaleTimeString());
+        }
+
+        loadDashboard();
+        setInterval(loadDashboard, 30000);
+    </script>
+</body>
+</html>

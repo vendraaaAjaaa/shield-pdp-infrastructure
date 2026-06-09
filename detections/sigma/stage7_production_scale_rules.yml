@@ -1,0 +1,119 @@
+title: Shield-PDP Stage 7 Production Scale Detection Rules
+id: shield-pdp-stage7-production-scale
+status: test
+rules:
+  - id: SHIELD-S7-K8S-GITOPS-001
+    title: Kubernetes manifest or GitOps rollout validated
+    level: medium
+    mitre:
+      - T1611
+      - T1195.002
+    detection:
+      selection:
+        event:
+          - stage7.kubernetes.manifest_validated
+          - stage7.gitops.rollout_planned
+          - stage7.gitops.rollback_simulated
+      condition: selection
+    falsepositives:
+      - Approved Stage 7 rollout simulation.
+  - id: SHIELD-S7-TELEMETRY-001
+    title: Distributed telemetry trace or SLA evaluation generated
+    level: medium
+    mitre:
+      - T1041
+      - T1021
+    detection:
+      selection:
+        event:
+          - stage7.telemetry.trace_generated
+          - stage7.telemetry.sla_evaluated
+      condition: selection
+    falsepositives:
+      - Expected observability validation workflow.
+  - id: SHIELD-S7-RESILIENCE-001
+    title: High availability or disaster recovery simulation completed
+    level: high
+    mitre:
+      - T1499
+      - T1562.008
+    detection:
+      selection:
+        event:
+          - stage7.resilience.failover_simulated
+          - stage7.resilience.recovery_verified
+      condition: selection
+    falsepositives:
+      - Scheduled resilience exercise.
+  - id: SHIELD-S7-MULTIENV-001
+    title: Multi-environment topology generated
+    level: medium
+    mitre:
+      - T1590
+      - T1046
+    detection:
+      selection:
+        event:
+          - stage7.environment.topology_generated
+      condition: selection
+    falsepositives:
+      - Enterprise topology modeling exercise.
+  - id: SHIELD-S7-ZEROTRUST-001
+    title: Zero-trust mesh policy evaluated
+    level: high
+    mitre:
+      - T1021
+      - T1550.001
+    detection:
+      selection:
+        event:
+          - stage7.mesh.policy_evaluated
+      condition: selection
+    falsepositives:
+      - Service-mesh policy validation.
+  - id: SHIELD-S7-GOVERNANCE-001
+    title: Governance compliance, drift, or secret lifecycle event
+    level: high
+    mitre:
+      - T1552
+      - T1528
+      - T1078
+      - T1082
+    detection:
+      selection:
+        event:
+          - stage7.governance.compliance_checked
+          - stage7.governance.policy_drift_detected
+          - stage7.governance.secrets_rotation_simulated
+      condition: selection
+    falsepositives:
+      - Governance scoring and secret lifecycle tabletop.
+  - id: SHIELD-S7-DELIVERY-001
+    title: Production CI/CD governance control executed
+    level: medium
+    mitre:
+      - T1195.002
+    detection:
+      selection:
+        event:
+          - stage7.delivery.artifact_verified
+          - stage7.delivery.image_verified
+          - stage7.delivery.dependency_scan_completed
+          - stage7.delivery.approval_recorded
+          - stage7.delivery.policy_validated
+      condition: selection
+    falsepositives:
+      - Approved delivery governance validation.
+  - id: SHIELD-S7-REPLAY-001
+    title: Enterprise-scale replay or dashboard analytics generated
+    level: medium
+    mitre:
+      - T1082
+    detection:
+      selection:
+        event:
+          - stage7.replay.export_generated
+          - stage7.dashboard.executive_view_generated
+      condition: selection
+    falsepositives:
+      - Executive dashboard and replay analytics workflow.

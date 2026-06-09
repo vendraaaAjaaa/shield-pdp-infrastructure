@@ -1,0 +1,113 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --font-display: "Aptos Display", "Avenir Next", "Segoe UI Variable", sans-serif;
+  --font-body: "IBM Plex Sans", "Aptos", "Helvetica Neue", sans-serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+
+  --background: 198 28% 97%;
+  --foreground: 207 46% 12%;
+  --muted: 196 23% 91%;
+  --muted-foreground: 202 12% 42%;
+  --card: 0 0% 100%;
+  --card-foreground: 207 46% 12%;
+  --border: 201 19% 84%;
+  --input: 201 19% 88%;
+  --ring: 172 66% 35%;
+  --primary: 172 64% 28%;
+  --primary-foreground: 178 36% 96%;
+  --success: 148 55% 34%;
+  --warning: 38 90% 48%;
+  --danger: 356 71% 47%;
+  --info: 203 76% 43%;
+  --risk-critical: 352 78% 45%;
+  --risk-high: 20 86% 52%;
+  --risk-medium: 42 91% 47%;
+  --risk-low: 151 52% 35%;
+}
+
+.dark {
+  color-scheme: dark;
+  --background: 205 38% 8%;
+  --foreground: 195 31% 94%;
+  --muted: 204 28% 14%;
+  --muted-foreground: 199 14% 66%;
+  --card: 204 33% 11%;
+  --card-foreground: 195 31% 94%;
+  --border: 203 26% 20%;
+  --input: 204 26% 18%;
+  --ring: 174 58% 47%;
+  --primary: 174 58% 43%;
+  --primary-foreground: 204 43% 9%;
+  --success: 149 57% 44%;
+  --warning: 40 92% 55%;
+  --danger: 356 73% 58%;
+  --info: 198 82% 56%;
+  --risk-critical: 356 77% 58%;
+  --risk-high: 20 89% 59%;
+  --risk-medium: 43 93% 57%;
+  --risk-low: 151 58% 46%;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: hsl(var(--background));
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background:
+    linear-gradient(135deg, rgba(13, 148, 136, 0.08), transparent 28%),
+    linear-gradient(315deg, rgba(2, 132, 199, 0.09), transparent 32%),
+    hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: var(--font-body);
+  letter-spacing: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+::selection {
+  background: hsla(var(--primary), 0.2);
+}
+
+.fintech-grid {
+  background-image:
+    linear-gradient(hsla(var(--border), 0.32) 1px, transparent 1px),
+    linear-gradient(90deg, hsla(var(--border), 0.32) 1px, transparent 1px);
+  background-size: 36px 36px;
+}
+
+.security-weave {
+  background:
+    radial-gradient(circle at 12% 22%, rgba(20, 184, 166, 0.22), transparent 34%),
+    radial-gradient(circle at 78% 12%, rgba(14, 116, 144, 0.18), transparent 30%),
+    linear-gradient(135deg, rgba(8, 47, 73, 0.92), rgba(6, 78, 59, 0.78)),
+    hsl(var(--background));
+}
+
+.text-balance {
+  text-wrap: balance;
+}

@@ -1,0 +1,1298 @@
+# Enterprise-stage overlay for Shield-PDP.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.enterprise.yml --profile stage1-core up -d
+#   docker compose -f docker-compose.yml -f docker-compose.enterprise.yml --profile enterprise config
+#
+# This overlay does not replace the existing stack. It adds real support
+# services and target trust-zone networks for the staged enterprise lab.
+
+x-enterprise-core-env: &enterprise_core_env
+  NODE_ENV: production
+  PORT: 8080
+  ENTERPRISE_JWT_ISSUER: ${ENTERPRISE_JWT_ISSUER:-shield-pdp-enterprise}
+  ENTERPRISE_JWT_AUDIENCE: ${ENTERPRISE_JWT_AUDIENCE:-shield-pdp-internal}
+  ENTERPRISE_JWT_SECRET: ${ENTERPRISE_JWT_SECRET:-shield-pdp-enterprise-lab-secret-change-before-production}
+  SERVICE_ACCOUNT_SECRET: ${SERVICE_ACCOUNT_SECRET:-shield-service-account-lab-secret}
+  LOG_INGEST_TOKEN: ${LOG_INGEST_TOKEN:-shield-log-ingest-lab-token}
+  AUTH_SERVICE_URL: http://auth-service:8080
+  LOG_COLLECTOR_URL: http://log-collector:8080
+  SIEM_BRIDGE_URL: http://siem-bridge:8080
+  DETECTION_ENGINE_URL: http://detection-engine:8080
+  CORRELATION_ENGINE_URL: http://correlation-engine:8080
+  ADVERSARY_CONTROL_URL: http://adversary-control:8080
+  BEACON_SIM_URL: http://beacon-sim:8080
+  REDIRECTOR_SIM_URL: http://redirector-sim:8080
+  PIVOT_SIM_URL: http://pivot-sim:8080
+  PERSISTENCE_SIM_URL: http://persistence-sim:8080
+  DIGITAL_TWIN_URL: http://digital-twin:8080
+  ATTACK_GRAPH_URL: http://attack-graph:8080
+  CAMPAIGN_ORCHESTRATOR_URL: http://campaign-orchestrator:8080
+  THREAT_HUNTING_URL: http://threat-hunting:8080
+  COVERAGE_INTEL_URL: http://coverage-intel:8080
+  CHAOS_SIM_URL: http://chaos-sim:8080
+  INTELLIGENCE_DASHBOARD_URL: http://intelligence-dashboard:8080
+  KUBERNETES_ORCHESTRATOR_URL: http://kubernetes-orchestrator:8080
+  GITOPS_CONTROLLER_URL: http://gitops-controller:8080
+  TELEMETRY_FABRIC_URL: http://telemetry-fabric:8080
+  RESILIENCE_HUB_URL: http://resilience-hub:8080
+  ENVIRONMENT_MANAGER_URL: http://environment-manager:8080
+  ZERO_TRUST_MESH_URL: http://zero-trust-mesh:8080
+  GOVERNANCE_ENGINE_URL: http://governance-engine:8080
+  DELIVERY_GOVERNANCE_URL: http://delivery-governance:8080
+  SCALE_DASHBOARD_URL: http://scale-dashboard:8080
+  PIPELINE_TOKEN: ${PIPELINE_TOKEN:-lab-pipeline-token-stage3}
+  STALE_TOKEN_GRACE_SECONDS: ${STALE_TOKEN_GRACE_SECONDS:-3600}
+  STAGE3_TARGETS_ENABLED: ${STAGE3_TARGETS_ENABLED:-false}
+  STAGE4_TARGETS_ENABLED: ${STAGE4_TARGETS_ENABLED:-false}
+  STAGE5_TARGETS_ENABLED: ${STAGE5_TARGETS_ENABLED:-false}
+  STAGE6_TARGETS_ENABLED: ${STAGE6_TARGETS_ENABLED:-false}
+  STAGE7_TARGETS_ENABLED: ${STAGE7_TARGETS_ENABLED:-false}
+
+x-enterprise-node-service: &enterprise_node_service
+  build:
+    context: ./services/enterprise-core
+  profiles:
+    - stage2-core
+    - stage3-core
+    - stage4-core
+    - stage5-core
+    - stage6-core
+    - stage7-core
+    - enterprise
+  expose:
+    - "8080"
+  healthcheck:
+    test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+    interval: 15s
+    timeout: 5s
+    retries: 10
+    start_period: 10s
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  read_only: true
+  tmpfs:
+    - /tmp
+  restart: unless-stopped
+
+services:
+  enterprise-redis:
+    image: redis:7.2-alpine
+    container_name: shield-pdp-enterprise-redis
+    profiles:
+      - stage1-core
+      - stage2-core
+      - stage3-core
+      - stage4-core
+      - stage5-core
+      - stage6-core
+      - stage7-core
+      - enterprise
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --save
+      - "60"
+      - "1"
+    volumes:
+      - shield_pdp_enterprise_redis_data:/data
+    networks:
+      - shield_pdp_data
+      - shield_pdp_enterprise
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    restart: unless-stopped
+
+  enterprise-rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: shield-pdp-enterprise-rabbitmq
+    profiles:
+      - stage1-core
+      - stage2-core
+      - stage3-core
+      - stage4-core
+      - stage5-core
+      - stage6-core
+      - stage7-core
+      - enterprise
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-shield}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-shield_rabbitmq_lab_password}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_DEFAULT_VHOST:-shield_lab}
+    volumes:
+      - shield_pdp_enterprise_rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - shield_pdp_data
+      - shield_pdp_observability
+      - shield_pdp_enterprise
+    ports:
+      - "127.0.0.1:15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  vault-sim:
+    image: hashicorp/vault:1.17
+    container_name: shield-pdp-vault-sim
+    profiles:
+      - stage1-identity
+      - stage2-core
+      - stage3-core
+      - stage4-core
+      - stage5-core
+      - stage6-core
+      - stage7-core
+      - enterprise
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_DEV_ROOT_TOKEN_ID:-shield-pdp-lab-root}
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+      VAULT_DISABLE_MLOCK: "true"
+    command: ["server", "-dev"]
+    networks:
+      - shield_pdp_identity
+      - shield_pdp_data
+    ports:
+      - "127.0.0.1:8200:8200"
+    healthcheck:
+      test: ["CMD-SHELL", "VAULT_ADDR=http://127.0.0.1:8200 vault status >/dev/null 2>&1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  git:
+    image: gitea/gitea:1.22-rootless
+    container_name: shield-pdp-git
+    profiles:
+      - stage1-devops
+      - enterprise
+    environment:
+      GITEA__database__DB_TYPE: sqlite3
+      GITEA__server__ROOT_URL: http://localhost:3001/
+      GITEA__server__SSH_DOMAIN: localhost
+      GITEA__server__SSH_PORT: 2222
+      GITEA__service__DISABLE_REGISTRATION: "false"
+      GITEA__security__INSTALL_LOCK: "true"
+    volumes:
+      - shield_pdp_gitea_data:/var/lib/gitea
+      - shield_pdp_gitea_config:/etc/gitea
+    networks:
+      - shield_pdp_devops
+      - shield_pdp_enterprise
+      - shield_pdp_observability
+    ports:
+      - "127.0.0.1:3001:3000"
+      - "127.0.0.1:2222:2222"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/ >/dev/null 2>&1 || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:v1.21
+    container_name: shield-pdp-mailpit
+    profiles:
+      - stage1-redteam
+      - enterprise
+    networks:
+      - shield_pdp_teamserver
+      - shield_pdp_enterprise
+      - shield_pdp_observability
+    ports:
+      - "127.0.0.1:8025:8025"
+      - "127.0.0.1:1025:1025"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+
+  auth-service:
+    <<: *enterprise_node_service
+    container_name: shield-pdp-auth-service
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: auth
+      SERVICE_NAME: auth-service
+      SERVICE_ACCOUNT_ID: auth-service
+    networks:
+      - shield_pdp_identity
+      - shield_pdp_enterprise
+      - shield_pdp_observability
+    depends_on:
+      log-collector:
+        condition: service_healthy
+
+  log-collector:
+    <<: *enterprise_node_service
+    container_name: shield-pdp-log-collector
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: log
+      SERVICE_NAME: log-collector
+      SERVICE_ACCOUNT_ID: log-collector
+      EVENT_STORE_PATH: /tmp/shield-pdp/events.jsonl
+    networks:
+      - shield_pdp_observability
+      - shield_pdp_identity
+      - shield_pdp_enterprise
+
+  employee-portal:
+    <<: *enterprise_node_service
+    container_name: shield-pdp-employee-portal
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: employee
+      SERVICE_NAME: employee-portal
+      SERVICE_ACCOUNT_ID: employee-portal
+    networks:
+      - shield_pdp_enterprise
+      - shield_pdp_identity
+      - shield_pdp_observability
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+
+  hr-portal:
+    <<: *enterprise_node_service
+    container_name: shield-pdp-hr-portal
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: hr
+      SERVICE_NAME: hr-portal
+      SERVICE_ACCOUNT_ID: hr-portal
+    networks:
+      - shield_pdp_enterprise
+      - shield_pdp_identity
+      - shield_pdp_observability
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+
+  finance-portal:
+    <<: *enterprise_node_service
+    container_name: shield-pdp-finance-portal
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: finance
+      SERVICE_NAME: finance-portal
+      SERVICE_ACCOUNT_ID: finance-portal
+    networks:
+      - shield_pdp_enterprise
+      - shield_pdp_identity
+      - shield_pdp_observability
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+
+  internal-admin-dashboard:
+    <<: *enterprise_node_service
+    container_name: shield-pdp-internal-admin-dashboard
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: admin
+      SERVICE_NAME: internal-admin-dashboard
+      SERVICE_ACCOUNT_ID: internal-admin-dashboard
+    networks:
+      - shield_pdp_enterprise
+      - shield_pdp_identity
+      - shield_pdp_observability
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+
+  developer-dashboard:
+    <<: *enterprise_node_service
+    container_name: shield-pdp-developer-dashboard
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: developer
+      SERVICE_NAME: developer-dashboard
+      SERVICE_ACCOUNT_ID: developer-dashboard
+    networks:
+      - shield_pdp_enterprise
+      - shield_pdp_identity
+      - shield_pdp_observability
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+
+  observability-api:
+    <<: *enterprise_node_service
+    container_name: shield-pdp-observability-api
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: observability
+      SERVICE_NAME: observability-api
+      SERVICE_ACCOUNT_ID: observability-api
+    networks:
+      - shield_pdp_observability
+      - shield_pdp_identity
+      - shield_pdp_enterprise
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+
+
+  service-discovery:
+    <<: *enterprise_node_service
+    profiles:
+      - stage3-core
+      - stage4-core
+      - stage5-core
+      - stage6-core
+      - stage7-core
+      - enterprise
+    container_name: shield-pdp-service-discovery
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: service-discovery
+      SERVICE_NAME: service-discovery
+      SERVICE_ACCOUNT_ID: service-discovery
+    networks:
+      - shield_pdp_enterprise
+      - shield_pdp_identity
+      - shield_pdp_observability
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+
+  internal-api:
+    <<: *enterprise_node_service
+    profiles:
+      - stage3-core
+      - stage4-core
+      - stage5-core
+      - stage6-core
+      - stage7-core
+      - enterprise
+    container_name: shield-pdp-internal-api
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: internal-api
+      SERVICE_NAME: internal-api
+      SERVICE_ACCOUNT_ID: internal-api
+    networks:
+      - shield_pdp_enterprise
+      - shield_pdp_identity
+      - shield_pdp_observability
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+      service-discovery:
+        condition: service_healthy
+
+  git-sim:
+    <<: *enterprise_node_service
+    profiles:
+      - stage3-core
+      - stage4-core
+      - stage5-core
+      - stage6-core
+      - stage7-core
+      - enterprise
+    container_name: shield-pdp-git-sim
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: git
+      SERVICE_NAME: git-sim
+      SERVICE_ACCOUNT_ID: git-sim
+    networks:
+      - shield_pdp_devops
+      - shield_pdp_enterprise
+      - shield_pdp_identity
+      - shield_pdp_observability
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+
+  ci-sim:
+    <<: *enterprise_node_service
+    profiles:
+      - stage3-core
+      - stage4-core
+      - stage5-core
+      - stage6-core
+      - stage7-core
+      - enterprise
+    container_name: shield-pdp-ci-sim
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: ci
+      SERVICE_NAME: ci-sim
+      SERVICE_ACCOUNT_ID: ci-sim
+    networks:
+      - shield_pdp_devops
+      - shield_pdp_enterprise
+      - shield_pdp_identity
+      - shield_pdp_data
+      - shield_pdp_observability
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+
+  artifact-store:
+    <<: *enterprise_node_service
+    profiles:
+      - stage3-core
+      - stage4-core
+      - stage5-core
+      - stage6-core
+      - stage7-core
+      - enterprise
+    container_name: shield-pdp-artifact-store
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: artifact
+      SERVICE_NAME: artifact-store
+      SERVICE_ACCOUNT_ID: artifact-store
+    networks:
+      - shield_pdp_devops
+      - shield_pdp_enterprise
+      - shield_pdp_identity
+      - shield_pdp_observability
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+
+  secrets-broker:
+    <<: *enterprise_node_service
+    profiles:
+      - stage3-core
+      - stage4-core
+      - stage5-core
+      - stage6-core
+      - stage7-core
+      - enterprise
+    container_name: shield-pdp-secrets-broker
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: secrets
+      SERVICE_NAME: secrets-broker
+      SERVICE_ACCOUNT_ID: secrets-broker
+    networks:
+      - shield_pdp_identity
+      - shield_pdp_enterprise
+      - shield_pdp_data
+      - shield_pdp_observability
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+
+  siem-bridge:
+    <<: *enterprise_node_service
+    profiles:
+      - stage4-core
+      - stage5-core
+      - stage6-core
+      - stage7-core
+      - enterprise
+    container_name: shield-pdp-siem-bridge
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: siem
+      SERVICE_NAME: siem-bridge
+      SERVICE_ACCOUNT_ID: siem-bridge
+    networks:
+      - shield_pdp_observability
+      - shield_pdp_identity
+      - shield_pdp_enterprise
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+
+  detection-engine:
+    <<: *enterprise_node_service
+    profiles:
+      - stage4-core
+      - stage5-core
+      - stage6-core
+      - stage7-core
+      - enterprise
+    container_name: shield-pdp-detection-engine
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: detection
+      SERVICE_NAME: detection-engine
+      SERVICE_ACCOUNT_ID: detection-engine
+    networks:
+      - shield_pdp_observability
+      - shield_pdp_identity
+      - shield_pdp_enterprise
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+      siem-bridge:
+        condition: service_healthy
+
+  correlation-engine:
+    <<: *enterprise_node_service
+    profiles:
+      - stage4-core
+      - stage5-core
+      - stage6-core
+      - stage7-core
+      - enterprise
+    container_name: shield-pdp-correlation-engine
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: correlation
+      SERVICE_NAME: correlation-engine
+      SERVICE_ACCOUNT_ID: correlation-engine
+    networks:
+      - shield_pdp_observability
+      - shield_pdp_identity
+      - shield_pdp_enterprise
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+      detection-engine:
+        condition: service_healthy
+
+  soc-dashboard:
+    <<: *enterprise_node_service
+    profiles:
+      - stage4-core
+      - stage5-core
+      - stage6-core
+      - stage7-core
+      - enterprise
+    container_name: shield-pdp-soc-dashboard
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: soc-dashboard
+      SERVICE_NAME: soc-dashboard
+      SERVICE_ACCOUNT_ID: soc-dashboard
+    networks:
+      - shield_pdp_observability
+      - shield_pdp_identity
+      - shield_pdp_enterprise
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+      detection-engine:
+        condition: service_healthy
+      correlation-engine:
+        condition: service_healthy
+
+  adversary-control:
+    <<: *enterprise_node_service
+    profiles:
+      - stage5-core
+      - stage6-core
+      - stage7-core
+      - enterprise
+    container_name: shield-pdp-adversary-control
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: adversary-control
+      SERVICE_NAME: adversary-control
+      SERVICE_ACCOUNT_ID: adversary-control
+    networks:
+      - shield_pdp_teamserver
+      - shield_pdp_enterprise
+      - shield_pdp_identity
+      - shield_pdp_observability
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+      detection-engine:
+        condition: service_healthy
+      correlation-engine:
+        condition: service_healthy
+      soc-dashboard:
+        condition: service_healthy
+
+  beacon-sim:
+    <<: *enterprise_node_service
+    profiles:
+      - stage5-core
+      - stage6-core
+      - stage7-core
+      - enterprise
+    container_name: shield-pdp-beacon-sim
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: beacon-sim
+      SERVICE_NAME: beacon-sim
+      SERVICE_ACCOUNT_ID: beacon-sim
+    networks:
+      - shield_pdp_teamserver
+      - shield_pdp_enterprise
+      - shield_pdp_identity
+      - shield_pdp_observability
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+      adversary-control:
+        condition: service_healthy
+
+  redirector-sim:
+    <<: *enterprise_node_service
+    profiles:
+      - stage5-core
+      - stage6-core
+      - stage7-core
+      - enterprise
+    container_name: shield-pdp-redirector-sim
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: redirector-sim
+      SERVICE_NAME: redirector-sim
+      SERVICE_ACCOUNT_ID: redirector-sim
+    networks:
+      - shield_pdp_teamserver
+      - shield_pdp_enterprise
+      - shield_pdp_identity
+      - shield_pdp_observability
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+      beacon-sim:
+        condition: service_healthy
+
+  pivot-sim:
+    <<: *enterprise_node_service
+    profiles:
+      - stage5-core
+      - stage6-core
+      - stage7-core
+      - enterprise
+    container_name: shield-pdp-pivot-sim
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: pivot-sim
+      SERVICE_NAME: pivot-sim
+      SERVICE_ACCOUNT_ID: pivot-sim
+    networks:
+      - shield_pdp_enterprise
+      - shield_pdp_devops
+      - shield_pdp_identity
+      - shield_pdp_observability
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+      internal-api:
+        condition: service_healthy
+      ci-sim:
+        condition: service_healthy
+      secrets-broker:
+        condition: service_healthy
+
+  persistence-sim:
+    <<: *enterprise_node_service
+    profiles:
+      - stage5-core
+      - stage6-core
+      - stage7-core
+      - enterprise
+    container_name: shield-pdp-persistence-sim
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: persistence-sim
+      SERVICE_NAME: persistence-sim
+      SERVICE_ACCOUNT_ID: persistence-sim
+    networks:
+      - shield_pdp_enterprise
+      - shield_pdp_devops
+      - shield_pdp_identity
+      - shield_pdp_observability
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+      ci-sim:
+        condition: service_healthy
+      secrets-broker:
+        condition: service_healthy
+
+  digital-twin:
+    <<: *enterprise_node_service
+    profiles:
+      - stage6-core
+      - stage7-core
+      - enterprise
+    container_name: shield-pdp-digital-twin
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: digital-twin
+      SERVICE_NAME: digital-twin
+      SERVICE_ACCOUNT_ID: digital-twin
+    networks:
+      - shield_pdp_enterprise
+      - shield_pdp_identity
+      - shield_pdp_observability
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+
+  attack-graph:
+    <<: *enterprise_node_service
+    profiles:
+      - stage6-core
+      - stage7-core
+      - enterprise
+    container_name: shield-pdp-attack-graph
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: attack-graph
+      SERVICE_NAME: attack-graph
+      SERVICE_ACCOUNT_ID: attack-graph
+    networks:
+      - shield_pdp_enterprise
+      - shield_pdp_devops
+      - shield_pdp_identity
+      - shield_pdp_observability
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+      digital-twin:
+        condition: service_healthy
+
+  campaign-orchestrator:
+    <<: *enterprise_node_service
+    profiles:
+      - stage6-core
+      - stage7-core
+      - enterprise
+    container_name: shield-pdp-campaign-orchestrator
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: campaign-orchestrator
+      SERVICE_NAME: campaign-orchestrator
+      SERVICE_ACCOUNT_ID: campaign-orchestrator
+    networks:
+      - shield_pdp_teamserver
+      - shield_pdp_enterprise
+      - shield_pdp_devops
+      - shield_pdp_identity
+      - shield_pdp_observability
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+      adversary-control:
+        condition: service_healthy
+      beacon-sim:
+        condition: service_healthy
+      pivot-sim:
+        condition: service_healthy
+      persistence-sim:
+        condition: service_healthy
+      attack-graph:
+        condition: service_healthy
+
+  threat-hunting:
+    <<: *enterprise_node_service
+    profiles:
+      - stage6-core
+      - stage7-core
+      - enterprise
+    container_name: shield-pdp-threat-hunting
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: threat-hunting
+      SERVICE_NAME: threat-hunting
+      SERVICE_ACCOUNT_ID: threat-hunting
+    networks:
+      - shield_pdp_enterprise
+      - shield_pdp_identity
+      - shield_pdp_observability
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+      detection-engine:
+        condition: service_healthy
+      correlation-engine:
+        condition: service_healthy
+      attack-graph:
+        condition: service_healthy
+
+  coverage-intel:
+    <<: *enterprise_node_service
+    profiles:
+      - stage6-core
+      - stage7-core
+      - enterprise
+    container_name: shield-pdp-coverage-intel
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: coverage-intel
+      SERVICE_NAME: coverage-intel
+      SERVICE_ACCOUNT_ID: coverage-intel
+    networks:
+      - shield_pdp_enterprise
+      - shield_pdp_identity
+      - shield_pdp_observability
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+      detection-engine:
+        condition: service_healthy
+      correlation-engine:
+        condition: service_healthy
+      threat-hunting:
+        condition: service_healthy
+
+  chaos-sim:
+    <<: *enterprise_node_service
+    profiles:
+      - stage6-core
+      - stage7-core
+      - enterprise
+    container_name: shield-pdp-chaos-sim
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: chaos-sim
+      SERVICE_NAME: chaos-sim
+      SERVICE_ACCOUNT_ID: chaos-sim
+    networks:
+      - shield_pdp_enterprise
+      - shield_pdp_devops
+      - shield_pdp_identity
+      - shield_pdp_observability
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+      coverage-intel:
+        condition: service_healthy
+
+  intelligence-dashboard:
+    <<: *enterprise_node_service
+    profiles:
+      - stage6-core
+      - stage7-core
+      - enterprise
+    container_name: shield-pdp-intelligence-dashboard
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: intelligence-dashboard
+      SERVICE_NAME: intelligence-dashboard
+      SERVICE_ACCOUNT_ID: intelligence-dashboard
+    networks:
+      - shield_pdp_enterprise
+      - shield_pdp_identity
+      - shield_pdp_observability
+      - shield_pdp_teamserver
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+      digital-twin:
+        condition: service_healthy
+      attack-graph:
+        condition: service_healthy
+      campaign-orchestrator:
+        condition: service_healthy
+      threat-hunting:
+        condition: service_healthy
+      coverage-intel:
+        condition: service_healthy
+      chaos-sim:
+        condition: service_healthy
+      soc-dashboard:
+        condition: service_healthy
+
+  kubernetes-orchestrator:
+    <<: *enterprise_node_service
+    profiles:
+      - stage7-core
+      - enterprise
+    container_name: shield-pdp-kubernetes-orchestrator
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: kubernetes-orchestrator
+      SERVICE_NAME: kubernetes-orchestrator
+      SERVICE_ACCOUNT_ID: kubernetes-orchestrator
+    networks:
+      - shield_pdp_enterprise
+      - shield_pdp_identity
+      - shield_pdp_observability
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+      observability-api:
+        condition: service_healthy
+
+  gitops-controller:
+    <<: *enterprise_node_service
+    profiles:
+      - stage7-core
+      - enterprise
+    container_name: shield-pdp-gitops-controller
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: gitops-controller
+      SERVICE_NAME: gitops-controller
+      SERVICE_ACCOUNT_ID: gitops-controller
+    networks:
+      - shield_pdp_enterprise
+      - shield_pdp_devops
+      - shield_pdp_identity
+      - shield_pdp_observability
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+      kubernetes-orchestrator:
+        condition: service_healthy
+      ci-sim:
+        condition: service_healthy
+
+  telemetry-fabric:
+    <<: *enterprise_node_service
+    profiles:
+      - stage7-core
+      - enterprise
+    container_name: shield-pdp-telemetry-fabric
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: telemetry-fabric
+      SERVICE_NAME: telemetry-fabric
+      SERVICE_ACCOUNT_ID: telemetry-fabric
+    networks:
+      - shield_pdp_enterprise
+      - shield_pdp_identity
+      - shield_pdp_observability
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+      detection-engine:
+        condition: service_healthy
+      correlation-engine:
+        condition: service_healthy
+
+  resilience-hub:
+    <<: *enterprise_node_service
+    profiles:
+      - stage7-core
+      - enterprise
+    container_name: shield-pdp-resilience-hub
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: resilience-hub
+      SERVICE_NAME: resilience-hub
+      SERVICE_ACCOUNT_ID: resilience-hub
+    networks:
+      - shield_pdp_enterprise
+      - shield_pdp_identity
+      - shield_pdp_observability
+      - shield_pdp_data
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+      telemetry-fabric:
+        condition: service_healthy
+
+  environment-manager:
+    <<: *enterprise_node_service
+    profiles:
+      - stage7-core
+      - enterprise
+    container_name: shield-pdp-environment-manager
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: environment-manager
+      SERVICE_NAME: environment-manager
+      SERVICE_ACCOUNT_ID: environment-manager
+    networks:
+      - shield_pdp_enterprise
+      - shield_pdp_identity
+      - shield_pdp_devops
+      - shield_pdp_observability
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+      attack-graph:
+        condition: service_healthy
+
+  zero-trust-mesh:
+    <<: *enterprise_node_service
+    profiles:
+      - stage7-core
+      - enterprise
+    container_name: shield-pdp-zero-trust-mesh
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: zero-trust-mesh
+      SERVICE_NAME: zero-trust-mesh
+      SERVICE_ACCOUNT_ID: zero-trust-mesh
+    networks:
+      - shield_pdp_enterprise
+      - shield_pdp_identity
+      - shield_pdp_devops
+      - shield_pdp_observability
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+      environment-manager:
+        condition: service_healthy
+
+  governance-engine:
+    <<: *enterprise_node_service
+    profiles:
+      - stage7-core
+      - enterprise
+    container_name: shield-pdp-governance-engine
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: governance-engine
+      SERVICE_NAME: governance-engine
+      SERVICE_ACCOUNT_ID: governance-engine
+    networks:
+      - shield_pdp_enterprise
+      - shield_pdp_identity
+      - shield_pdp_devops
+      - shield_pdp_observability
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+      zero-trust-mesh:
+        condition: service_healthy
+
+  delivery-governance:
+    <<: *enterprise_node_service
+    profiles:
+      - stage7-core
+      - enterprise
+    container_name: shield-pdp-delivery-governance
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: delivery-governance
+      SERVICE_NAME: delivery-governance
+      SERVICE_ACCOUNT_ID: delivery-governance
+    networks:
+      - shield_pdp_enterprise
+      - shield_pdp_devops
+      - shield_pdp_identity
+      - shield_pdp_observability
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+      gitops-controller:
+        condition: service_healthy
+      governance-engine:
+        condition: service_healthy
+      artifact-store:
+        condition: service_healthy
+
+  scale-dashboard:
+    <<: *enterprise_node_service
+    profiles:
+      - stage7-core
+      - enterprise
+    container_name: shield-pdp-scale-dashboard
+    environment:
+      <<: *enterprise_core_env
+      SERVICE_MODE: scale-dashboard
+      SERVICE_NAME: scale-dashboard
+      SERVICE_ACCOUNT_ID: scale-dashboard
+    networks:
+      - shield_pdp_enterprise
+      - shield_pdp_identity
+      - shield_pdp_observability
+      - shield_pdp_devops
+      - shield_pdp_teamserver
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+      kubernetes-orchestrator:
+        condition: service_healthy
+      gitops-controller:
+        condition: service_healthy
+      telemetry-fabric:
+        condition: service_healthy
+      resilience-hub:
+        condition: service_healthy
+      environment-manager:
+        condition: service_healthy
+      zero-trust-mesh:
+        condition: service_healthy
+      governance-engine:
+        condition: service_healthy
+      delivery-governance:
+        condition: service_healthy
+
+  enterprise-gateway:
+    image: nginx:1.27-alpine
+    container_name: shield-pdp-enterprise-gateway
+    profiles:
+      - stage2-core
+      - stage3-core
+      - stage4-core
+      - stage5-core
+      - stage6-core
+      - stage7-core
+      - enterprise
+    entrypoint: ["nginx", "-g", "daemon off;"]
+    user: "101:101"
+    ports:
+      - "0.0.0.0:3100:8080"
+    volumes:
+      - ./infrastructure/nginx/enterprise-gateway.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - shield_pdp_edge
+      - shield_pdp_identity
+      - shield_pdp_enterprise
+      - shield_pdp_observability
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      employee-portal:
+        condition: service_healthy
+      hr-portal:
+        condition: service_healthy
+      finance-portal:
+        condition: service_healthy
+      internal-admin-dashboard:
+        condition: service_healthy
+      developer-dashboard:
+        condition: service_healthy
+      log-collector:
+        condition: service_healthy
+      observability-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health >/dev/null 2>&1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    restart: unless-stopped
+
+networks:
+  shield_pdp_edge:
+    name: shield_pdp_edge
+
+  shield_pdp_teamserver:
+    name: shield_pdp_teamserver
+    internal: true
+
+  shield_pdp_enterprise:
+    name: shield_pdp_enterprise
+    internal: true
+
+  shield_pdp_identity:
+    name: shield_pdp_identity
+    internal: true
+
+  shield_pdp_devops:
+    name: shield_pdp_devops
+    internal: true
+
+  shield_pdp_data:
+    name: shield_pdp_data
+    internal: true
+
+  shield_pdp_observability:
+    name: shield_pdp_observability
+    internal: true
+
+volumes:
+  shield_pdp_enterprise_redis_data:
+  shield_pdp_enterprise_rabbitmq_data:
+  shield_pdp_gitea_data:
+  shield_pdp_gitea_config:
