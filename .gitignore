@@ -1,0 +1,81 @@
+# environment / secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+apps/web/.env.local
+apps/web/.env*.local
+apps/web/.env
+apps/web/.env.*
+!apps/web/.env.example
+!apps/web/.env.local.example
+/opt/shield/secrets/
+**/database.env
+**/*secret*
+**/*secrets*
+**/*.key
+**/*.pem
+**/*.p12
+**/*.pfx
+**/id_rsa
+**/id_ed25519
+
+# tokens / reports that may contain sensitive runtime evidence
+**/*token*
+**/*credential*
+**/*api_key*
+**/*apikey*
+reports/compliance/*.json
+reports/pentest/redteam_validation.json
+
+# databases / dumps / backups
+*.dump
+*.sql.gz
+*.psql
+*.backup
+*.sqlite
+*.db
+backups/
+*.bak
+
+# node / python / build
+node_modules/
+.next/
+dist/
+build/
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+.venv/
+venv/
+
+# logs
+*.log
+logs/
+api_debug.log
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
+
+# test/build artifacts
+apps/web/test-results/
+apps/web/playwright-report/
+apps/web/tsconfig.tsbuildinfo
+
+# runtime/generated reports - review manually before publishing
+reports/pentest/*.json
+reports/pentest/*.md
+reports/*.md
+
+# test/build artifacts
+apps/web/test-results/
+apps/web/playwright-report/
+apps/web/tsconfig.tsbuildinfo
+
+# runtime/generated reports - review manually before publishing
+reports/pentest/*.json
+reports/pentest/*.md
+reports/*.md
